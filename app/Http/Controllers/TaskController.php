@@ -22,6 +22,8 @@ class TaskController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Task::class);
+
         $query = Task::with(['project', 'assignedUsers', 'creator']);
 
         // Filter by project
@@ -75,6 +77,8 @@ class TaskController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Task::class);
+
         $projects = Project::orderBy('name')->get();
         $users = User::where('tenant_id', auth()->user()->tenant_id)
             ->orderBy('name')
@@ -88,6 +92,8 @@ class TaskController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Task::class);
+
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
             'title' => 'required|string|max:255',
@@ -129,6 +135,8 @@ class TaskController extends Controller
      */
     public function show(Task $task)
     {
+        $this->authorize('view', $task);
+
         $task->load(['project', 'assignedUsers', 'creator']);
 
         return view('tasks.show', compact('task'));
@@ -139,6 +147,8 @@ class TaskController extends Controller
      */
     public function edit(Task $task)
     {
+        $this->authorize('update', $task);
+
         $projects = Project::orderBy('name')->get();
         $users = User::where('tenant_id', auth()->user()->tenant_id)
             ->orderBy('name')
@@ -154,6 +164,8 @@ class TaskController extends Controller
      */
     public function update(Request $request, Task $task)
     {
+        $this->authorize('update', $task);
+
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
             'title' => 'required|string|max:255',
@@ -193,6 +205,8 @@ class TaskController extends Controller
      */
     public function destroy(Task $task)
     {
+        $this->authorize('delete', $task);
+
         $task->delete();
 
         return redirect()

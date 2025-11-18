@@ -21,6 +21,8 @@ class ProjectController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Project::class);
+
         $query = Project::with('owner');
 
         // Filter by status
@@ -52,6 +54,8 @@ class ProjectController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Project::class);
+
         $users = User::where('tenant_id', auth()->user()->tenant_id)
             ->orderBy('name')
             ->get();
@@ -64,6 +68,8 @@ class ProjectController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Project::class);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -97,6 +103,8 @@ class ProjectController extends Controller
      */
     public function show(Project $project)
     {
+        $this->authorize('view', $project);
+
         $project->load(['owner', 'tasks.assignedUsers']);
 
         // Get project statistics
@@ -124,6 +132,8 @@ class ProjectController extends Controller
      */
     public function edit(Project $project)
     {
+        $this->authorize('update', $project);
+
         $users = User::where('tenant_id', auth()->user()->tenant_id)
             ->orderBy('name')
             ->get();
@@ -136,6 +146,8 @@ class ProjectController extends Controller
      */
     public function update(Request $request, Project $project)
     {
+        $this->authorize('update', $project);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -168,6 +180,8 @@ class ProjectController extends Controller
      */
     public function destroy(Project $project)
     {
+        $this->authorize('delete', $project);
+
         $project->delete();
 
         return redirect()
