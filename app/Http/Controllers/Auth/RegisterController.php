@@ -28,12 +28,34 @@ class RegisterController extends Controller
      */
     public function register(Request $request)
     {
+        $reservedSubdomains = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'localhost', 'staging', 'test', 'dev'];
+
         $request->validate([
             'company_name' => 'required|string|max:255',
-            'subdomain' => 'required|string|max:50|alpha_dash|unique:tenants,subdomain',
+            'subdomain' => [
+                'required',
+                'string',
+                'min:3',
+                'max:50',
+                'alpha_dash',
+                'unique:tenants,subdomain',
+                function ($attribute, $value, $fail) use ($reservedSubdomains) {
+                    if (in_array(strtolower($value), $reservedSubdomains)) {
+                        $fail('The subdomain is reserved and cannot be used.');
+                    }
+                },
+            ],
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
+            'email' => 'required|string|email:rfc,dns|max:255|unique:users,email',
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/', // at least one uppercase, one lowercase, one digit
+            ],
+        ], [
+            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number.',
         ]);
 
         try {
@@ -50,6 +72,10 @@ class RegisterController extends Controller
 
             // Get admin role
             $adminRole = Role::where('slug', 'admin')->first();
+
+            if (!$adminRole) {
+                throw new \Exception('Admin role not found. Please run database seeders.');
+            }
 
             // Create admin user for this tenant
             $user = User::create([
@@ -73,9 +99,16 @@ class RegisterController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
+            // Log the error for debugging
+            \Log::error('Registration failed: ' . $e->getMessage(), [
+                'email' => $request->email,
+                'subdomain' => $request->subdomain,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return back()
                 ->withInput($request->except('password', 'password_confirmation'))
-                ->withErrors(['error' => 'Registration failed. Please try again.']);
+                ->withErrors(['error' => 'Registration failed: ' . $e->getMessage()]);
         }
     }
 }

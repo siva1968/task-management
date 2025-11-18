@@ -85,6 +85,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the tasks created by the user.
+     */
+    public function createdTasks()
+    {
+        return $this->hasMany(Task::class, 'created_by');
+    }
+
+    /**
      * Check if user has a specific permission.
      */
     public function hasPermission(string $permissionSlug): bool
@@ -112,5 +120,55 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->hasRole('admin');
+    }
+
+    /**
+     * Check if user is manager.
+     */
+    public function isManager(): bool
+    {
+        return $this->hasRole('manager');
+    }
+
+    /**
+     * Check if user is team member.
+     */
+    public function isTeamMember(): bool
+    {
+        return $this->hasRole('team_member');
+    }
+
+    /**
+     * Check if user is client viewer.
+     */
+    public function isClientViewer(): bool
+    {
+        return $this->hasRole('client_viewer');
+    }
+
+    /**
+     * Scope for active users only.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Get user initials for avatar display.
+     */
+    public function getInitialsAttribute(): string
+    {
+        $names = explode(' ', $this->name);
+        $initials = '';
+
+        foreach ($names as $name) {
+            $initials .= strtoupper(substr($name, 0, 1));
+            if (strlen($initials) >= 2) {
+                break;
+            }
+        }
+
+        return $initials ?: 'U';
     }
 }

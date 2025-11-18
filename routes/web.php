@@ -24,11 +24,14 @@ Route::middleware('guest')->group(function () {
         return redirect()->route('login');
     });
 
-    // Authentication routes
+    // Authentication routes with rate limiting
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+    Route::post('/login', [LoginController::class, 'login'])
+        ->middleware('throttle:5,1'); // 5 attempts per minute
+
     Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-    Route::post('/register', [RegisterController::class, 'register']);
+    Route::post('/register', [RegisterController::class, 'register'])
+        ->middleware('throttle:3,10'); // 3 attempts per 10 minutes
 });
 
 // Authenticated routes
@@ -43,4 +46,6 @@ Route::middleware('auth')->group(function () {
 
     // Tasks
     Route::resource('tasks', TaskController::class);
+    Route::patch('/tasks/{task}/complete', [TaskController::class, 'markAsComplete'])->name('tasks.complete');
+    Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.update-status');
 });

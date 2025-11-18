@@ -157,4 +157,73 @@ class Task extends Model
     {
         return $query->where('status', 'completed');
     }
+
+    /**
+     * Scope for tasks assigned to a specific user.
+     */
+    public function scopeAssignedTo($query, $userId)
+    {
+        return $query->whereHas('assignedUsers', function ($q) use ($userId) {
+            $q->where('users.id', $userId);
+        });
+    }
+
+    /**
+     * Scope for tasks due soon (within X days).
+     */
+    public function scopeDueSoon($query, int $days = 7)
+    {
+        return $query->where('due_date', '>=', now())
+            ->where('due_date', '<=', now()->addDays($days))
+            ->where('status', '!=', 'completed');
+    }
+
+    /**
+     * Check if task is assigned to a specific user.
+     */
+    public function isAssignedTo(User $user): bool
+    {
+        return $this->assignedUsers->contains($user->id);
+    }
+
+    /**
+     * Get remaining hours (estimated minus actual).
+     */
+    public function getRemainingHours(): float
+    {
+        if (!$this->estimated_hours) {
+            return 0;
+        }
+
+        return max(0, $this->estimated_hours - $this->actual_hours);
+    }
+
+    /**
+     * Get status badge color for UI.
+     */
+    public function getStatusBadgeColorAttribute(): string
+    {
+        return match($this->status) {
+            'backlog' => 'gray',
+            'in_progress' => 'blue',
+            'review' => 'yellow',
+            'completed' => 'green',
+            'cancelled' => 'red',
+            default => 'gray',
+        };
+    }
+
+    /**
+     * Get priority badge color for UI.
+     */
+    public function getPriorityBadgeColorAttribute(): string
+    {
+        return match($this->priority) {
+            'low' => 'gray',
+            'medium' => 'blue',
+            'high' => 'orange',
+            'urgent' => 'red',
+            default => 'gray',
+        };
+    }
 }

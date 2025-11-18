@@ -97,4 +97,75 @@ class Project extends Model
     {
         return $this->tasks()->sum('actual_hours') ?? 0;
     }
+
+    /**
+     * Scope for filtering by status.
+     */
+    public function scopeByStatus($query, string $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope for active projects.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
+    /**
+     * Check if project is overdue (past end date and not completed).
+     */
+    public function isOverdue(): bool
+    {
+        return $this->end_date &&
+               $this->end_date->isPast() &&
+               !in_array($this->status, ['completed', 'archived']);
+    }
+
+    /**
+     * Check if project is completed.
+     */
+    public function isCompleted(): bool
+    {
+        return $this->status === 'completed';
+    }
+
+    /**
+     * Get overdue tasks for this project.
+     */
+    public function getOverdueTasks()
+    {
+        return $this->tasks()->overdue()->get();
+    }
+
+    /**
+     * Get budget utilization percentage (assuming hourly rate).
+     */
+    public function getBudgetUtilization(float $hourlyRate = 100): float
+    {
+        if (!$this->budget || $this->budget == 0) {
+            return 0;
+        }
+
+        $costSoFar = $this->totalActualHours() * $hourlyRate;
+
+        return round(($costSoFar / $this->budget) * 100, 2);
+    }
+
+    /**
+     * Get status badge color for UI.
+     */
+    public function getStatusBadgeColorAttribute(): string
+    {
+        return match($this->status) {
+            'planning' => 'gray',
+            'active' => 'blue',
+            'on_hold' => 'yellow',
+            'completed' => 'green',
+            'archived' => 'gray',
+            default => 'gray',
+        };
+    }
 }

@@ -39,9 +39,19 @@ class ProjectController extends Controller
             });
         }
 
-        // Sort
+        // Sort - validate column to prevent SQL injection
+        $allowedSortColumns = ['created_at', 'name', 'start_date', 'end_date', 'status', 'updated_at'];
         $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
+
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
         $query->orderBy($sortBy, $sortOrder);
 
         $projects = $query->paginate(15);
@@ -70,6 +80,8 @@ class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
+        $tenantId = auth()->user()->tenant_id;
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -78,7 +90,18 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'budget' => 'nullable|numeric|min:0',
-            'owner_id' => 'nullable|exists:users,id',
+            'owner_id' => [
+                'nullable',
+                'exists:users,id',
+                function ($attribute, $value, $fail) use ($tenantId) {
+                    if ($value) {
+                        $user = \App\Models\User::find($value);
+                        if (!$user || $user->tenant_id !== $tenantId) {
+                            $fail('The selected owner is invalid.');
+                        }
+                    }
+                },
+            ],
         ]);
 
         $project = Project::create([
@@ -148,6 +171,8 @@ class ProjectController extends Controller
     {
         $this->authorize('update', $project);
 
+        $tenantId = auth()->user()->tenant_id;
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -156,7 +181,18 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'budget' => 'nullable|numeric|min:0',
-            'owner_id' => 'nullable|exists:users,id',
+            'owner_id' => [
+                'nullable',
+                'exists:users,id',
+                function ($attribute, $value, $fail) use ($tenantId) {
+                    if ($value) {
+                        $user = \App\Models\User::find($value);
+                        if (!$user || $user->tenant_id !== $tenantId) {
+                            $fail('The selected owner is invalid.');
+                        }
+                    }
+                },
+            ],
         ]);
 
         $project->update([
