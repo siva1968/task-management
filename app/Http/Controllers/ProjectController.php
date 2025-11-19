@@ -23,7 +23,7 @@ class ProjectController extends Controller
     {
         $this->authorize('viewAny', Project::class);
 
-        $query = Project::with('owner');
+        $query = Project::with('owner')->withCount('tasks');
 
         // Filter by status
         if ($request->filled('status')) {
