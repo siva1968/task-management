@@ -1,0 +1,227 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Project;
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class ProjectController extends Controller
+{
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+
+    /**
+     * Display a listing of projects.
+     */
+    public function index(Request $request)
+    {
+        $this->authorize('viewAny', Project::class);
+
+        $query = Project::with('owner');
+
+        // Filter by status
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Search
+        if ($request->filled('search')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                  ->orWhere('description', 'like', '%' . $request->search . '%')
+                  ->orWhere('client_name', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        // Sort - validate column to prevent SQL injection
+        $allowedSortColumns = ['created_at', 'name', 'start_date', 'end_date', 'status', 'updated_at'];
+        $sortBy = $request->get('sort_by', 'created_at');
+        $sortOrder = $request->get('sort_order', 'desc');
+
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        $query->orderBy($sortBy, $sortOrder);
+
+        $projects = $query->paginate(15);
+
+        return view('projects.index', compact('projects'));
+    }
+
+    /**
+     * Show the form for creating a new project.
+     */
+    public function create()
+    {
+        $this->authorize('create', Project::class);
+
+        $users = User::where('tenant_id', auth()->user()->tenant_id)
+            ->orderBy('name')
+            ->get();
+
+        return view('projects.create', compact('users'));
+    }
+
+    /**
+     * Store a newly created project.
+     */
+    public function store(Request $request)
+    {
+        $this->authorize('create', Project::class);
+
+        $tenantId = auth()->user()->tenant_id;
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'client_name' => 'nullable|string|max:255',
+            'status' => 'required|in:planning,active,on_hold,completed,archived',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'budget' => 'nullable|numeric|min:0',
+            'owner_id' => [
+                'nullable',
+                'exists:users,id',
+                function ($attribute, $value, $fail) use ($tenantId) {
+                    if ($value) {
+                        $user = \App\Models\User::find($value);
+                        if (!$user || $user->tenant_id !== $tenantId) {
+                            $fail('The selected owner is invalid.');
+                        }
+                    }
+                },
+            ],
+        ]);
+
+        $project = Project::create([
+            'tenant_id' => auth()->user()->tenant_id,
+            'owner_id' => $validated['owner_id'] ?? auth()->id(),
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'client_name' => $validated['client_name'] ?? null,
+            'status' => $validated['status'],
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'budget' => $validated['budget'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project created successfully.');
+    }
+
+    /**
+     * Display the specified project.
+     */
+    public function show(Project $project)
+    {
+        $this->authorize('view', $project);
+
+        $project->load(['owner', 'tasks.assignedUsers']);
+
+        // Get project statistics
+        $stats = [
+            'total_tasks' => $project->tasks->count(),
+            'completed_tasks' => $project->tasks->where('status', 'completed')->count(),
+            'in_progress_tasks' => $project->tasks->where('status', 'in_progress')->count(),
+            'overdue_tasks' => $project->tasks->filter->isOverdue()->count(),
+            'completion_percentage' => $project->completionPercentage(),
+            'total_estimated_hours' => $project->totalEstimatedHours(),
+            'total_actual_hours' => $project->totalActualHours(),
+        ];
+
+        // Get task breakdown by status
+        $tasksByStatus = $project->tasks->groupBy('status');
+
+        // Get task breakdown by priority
+        $tasksByPriority = $project->tasks->groupBy('priority');
+
+        return view('projects.show', compact('project', 'stats', 'tasksByStatus', 'tasksByPriority'));
+    }
+
+    /**
+     * Show the form for editing the project.
+     */
+    public function edit(Project $project)
+    {
+        $this->authorize('update', $project);
+
+        $users = User::where('tenant_id', auth()->user()->tenant_id)
+            ->orderBy('name')
+            ->get();
+
+        return view('projects.edit', compact('project', 'users'));
+    }
+
+    /**
+     * Update the specified project.
+     */
+    public function update(Request $request, Project $project)
+    {
+        $this->authorize('update', $project);
+
+        $tenantId = auth()->user()->tenant_id;
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'client_name' => 'nullable|string|max:255',
+            'status' => 'required|in:planning,active,on_hold,completed,archived',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'budget' => 'nullable|numeric|min:0',
+            'owner_id' => [
+                'nullable',
+                'exists:users,id',
+                function ($attribute, $value, $fail) use ($tenantId) {
+                    if ($value) {
+                        $user = \App\Models\User::find($value);
+                        if (!$user || $user->tenant_id !== $tenantId) {
+                            $fail('The selected owner is invalid.');
+                        }
+                    }
+                },
+            ],
+        ]);
+
+        $project->update([
+            'owner_id' => $validated['owner_id'] ?? $project->owner_id,
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'client_name' => $validated['client_name'] ?? null,
+            'status' => $validated['status'],
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'budget' => $validated['budget'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project updated successfully.');
+    }
+
+    /**
+     * Remove the specified project.
+     */
+    public function destroy(Project $project)
+    {
+        $this->authorize('delete', $project);
+
+        $project->delete();
+
+        return redirect()
+            ->route('projects.index')
+            ->with('success', 'Project deleted successfully.');
+    }
+}
