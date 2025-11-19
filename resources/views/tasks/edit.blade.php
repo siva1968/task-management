@@ -165,6 +165,25 @@
                 </div>
             </div>
 
+            <!-- AI Task Breakdown -->
+            <div class="border border-indigo-200 rounded-lg p-4 bg-indigo-50">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-medium text-gray-900">AI Task Breakdown</h3>
+                    <button type="button" onclick="breakdownTask()" id="ai-breakdown-btn"
+                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Generate Subtasks
+                    </button>
+                </div>
+                <p class="text-xs text-gray-600 mb-3">AI can break down this task into smaller, actionable subtasks.</p>
+                <div id="subtasks-container" class="hidden">
+                    <div class="space-y-2 max-h-64 overflow-y-auto" id="subtasks-list"></div>
+                    <p class="text-xs text-gray-500 mt-2 italic">Note: These are AI suggestions. You can create them manually as separate tasks.</p>
+                </div>
+            </div>
+
             <!-- Actions -->
             <div class="flex justify-between items-center pt-4 border-t">
                 <form action="{{ route('tasks.destroy', $task) }}" method="POST"
@@ -313,6 +332,67 @@ async function estimateHours() {
         btn.disabled = false;
         btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>AI Estimate';
     }
+}
+
+// AI Task Breakdown
+async function breakdownTask() {
+    const title = document.getElementById('title').value;
+    const description = document.getElementById('description').value;
+    const btn = document.getElementById('ai-breakdown-btn');
+    const container = document.getElementById('subtasks-container');
+    const list = document.getElementById('subtasks-list');
+
+    if (!title) {
+        alert('Please enter a task title first');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...';
+
+    try {
+        const response = await fetch('/ai/task/breakdown', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({ title, description })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.subtasks && data.subtasks.length > 0) {
+            list.innerHTML = data.subtasks.map((subtask, index) => `
+                <div class="bg-white p-3 rounded border border-gray-200">
+                    <div class="flex items-start">
+                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-100 text-indigo-600 text-xs font-medium mr-2 flex-shrink-0">
+                            ${index + 1}
+                        </span>
+                        <div class="flex-1">
+                            <h4 class="text-sm font-medium text-gray-900">${escapeHtml(subtask.title)}</h4>
+                            ${subtask.description ? `<p class="text-xs text-gray-600 mt-1">${escapeHtml(subtask.description)}</p>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            container.classList.remove('hidden');
+        } else {
+            alert('AI Error: ' + (data.error || 'Failed to generate subtasks'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Generate Subtasks';
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 </script>
 @endsection

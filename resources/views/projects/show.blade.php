@@ -94,6 +94,40 @@
                 </div>
             </div>
 
+            <!-- AI Risk Analysis -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">AI Risk Analysis</h2>
+                    <button onclick="analyzeRisks()" id="analyze-risks-btn"
+                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        Analyze
+                    </button>
+                </div>
+                <div id="ai-risks-content" class="space-y-3">
+                    <p class="text-gray-500 italic text-sm">Click "Analyze" to identify potential project risks</p>
+                </div>
+            </div>
+
+            <!-- AI Completion Prediction -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">Completion Prediction</h2>
+                    <button onclick="predictCompletion()" id="predict-completion-btn"
+                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Predict
+                    </button>
+                </div>
+                <div id="ai-completion-content">
+                    <p class="text-gray-500 italic text-sm">Click "Predict" to estimate project completion date</p>
+                </div>
+            </div>
+
             <!-- Tasks List -->
             <div class="bg-white shadow rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -312,6 +346,140 @@ async function generateSummary() {
         btn.disabled = false;
         btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Generate';
     }
+}
+
+// Analyze Project Risks
+async function analyzeRisks() {
+    const projectId = {{ $project->id }};
+    const btn = document.getElementById('analyze-risks-btn');
+    const content = document.getElementById('ai-risks-content');
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Analyzing...';
+    content.innerHTML = '<p class="text-gray-500 italic text-sm">AI is analyzing project risks...</p>';
+
+    try {
+        const response = await fetch(`/ai/project/${projectId}/risks`);
+        const data = await response.json();
+
+        if (data.success && data.risks && data.risks.length > 0) {
+            content.innerHTML = data.risks.map(risk => `
+                <div class="border-l-4 ${getSeverityColor(risk.severity)} bg-gray-50 p-3 rounded">
+                    <div class="flex items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center">
+                                <h4 class="text-sm font-semibold text-gray-900">${escapeHtml(risk.title)}</h4>
+                                <span class="ml-2 px-2 py-0.5 text-xs font-medium rounded ${getSeverityBadge(risk.severity)}">
+                                    ${escapeHtml(risk.severity)}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">${escapeHtml(risk.description)}</p>
+                            <div class="mt-2 pt-2 border-t border-gray-200">
+                                <p class="text-xs text-gray-700"><strong>Mitigation:</strong> ${escapeHtml(risk.mitigation)}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } else if (data.success && (!data.risks || data.risks.length === 0)) {
+            content.innerHTML = '<p class="text-green-600 text-sm">No significant risks identified. Project appears to be on track!</p>';
+        } else {
+            content.innerHTML = '<p class="text-red-600 text-sm">Error: ' + (data.error || 'Failed to analyze risks') + '</p>';
+        }
+    } catch (error) {
+        content.innerHTML = '<p class="text-red-600 text-sm">Error: ' + error.message + '</p>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>Analyze';
+    }
+}
+
+// Predict Project Completion
+async function predictCompletion() {
+    const projectId = {{ $project->id }};
+    const btn = document.getElementById('predict-completion-btn');
+    const content = document.getElementById('ai-completion-content');
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Predicting...';
+    content.innerHTML = '<p class="text-gray-500 italic text-sm">AI is predicting completion date...</p>';
+
+    try {
+        const response = await fetch(`/ai/project/${projectId}/completion`);
+        const data = await response.json();
+
+        if (data.success && data.prediction) {
+            const pred = data.prediction;
+            content.innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Predicted Completion:</span>
+                        <span class="text-sm font-semibold text-gray-900">${pred.predicted_date || 'N/A'}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Confidence:</span>
+                        <span class="px-2 py-1 text-xs font-medium rounded ${getConfidenceColor(pred.confidence)}">
+                            ${escapeHtml(pred.confidence)}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">On Track:</span>
+                        <span class="text-sm font-medium ${pred.on_track ? 'text-green-600' : 'text-red-600'}">
+                            ${pred.on_track ? '✓ Yes' : '✗ No'}
+                        </span>
+                    </div>
+                    ${pred.analysis ? `
+                        <div class="pt-3 border-t border-gray-200">
+                            <p class="text-xs text-gray-700">${escapeHtml(pred.analysis)}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            content.innerHTML = '<p class="text-red-600 text-sm">Error: ' + (data.error || 'Failed to predict completion') + '</p>';
+        }
+    } catch (error) {
+        content.innerHTML = '<p class="text-red-600 text-sm">Error: ' + error.message + '</p>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Predict';
+    }
+}
+
+// Helper functions
+function getSeverityColor(severity) {
+    const colors = {
+        'low': 'border-yellow-400',
+        'medium': 'border-orange-400',
+        'high': 'border-red-400',
+        'critical': 'border-red-600'
+    };
+    return colors[severity] || 'border-gray-400';
+}
+
+function getSeverityBadge(severity) {
+    const badges = {
+        'low': 'bg-yellow-100 text-yellow-800',
+        'medium': 'bg-orange-100 text-orange-800',
+        'high': 'bg-red-100 text-red-800',
+        'critical': 'bg-red-200 text-red-900'
+    };
+    return badges[severity] || 'bg-gray-100 text-gray-800';
+}
+
+function getConfidenceColor(confidence) {
+    const colors = {
+        'low': 'bg-red-100 text-red-800',
+        'medium': 'bg-yellow-100 text-yellow-800',
+        'high': 'bg-green-100 text-green-800'
+    };
+    return colors[confidence] || 'bg-gray-100 text-gray-800';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 </script>
 @endsection
