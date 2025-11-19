@@ -279,6 +279,23 @@
             </div>
             @endif
 
+            <!-- AI Suggested Tasks -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">AI Suggested Tasks</h2>
+                    <button onclick="suggestNextTasks()" id="suggest-tasks-btn"
+                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                        Generate
+                    </button>
+                </div>
+                <div id="suggested-tasks-content">
+                    <p class="text-gray-500 italic text-sm">Click "Generate" to get AI-powered task suggestions for this project</p>
+                </div>
+            </div>
+
             <!-- Quick Actions -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h2 class="text-lg font-medium text-gray-900 mb-4">Actions</h2>
@@ -480,6 +497,73 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Suggest Next Tasks
+async function suggestNextTasks() {
+    const projectId = {{ $project->id }};
+    const btn = document.getElementById('suggest-tasks-btn');
+    const content = document.getElementById('suggested-tasks-content');
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...';
+    content.innerHTML = '<p class="text-gray-500 italic text-sm">AI is analyzing your project to suggest next tasks...</p>';
+
+    try {
+        const response = await fetch(`/ai/project/${projectId}/suggest-tasks`);
+        const data = await response.json();
+
+        if (data.success && data.suggestions && data.suggestions.length > 0) {
+            content.innerHTML = `
+                <div class="space-y-3">
+                    ${data.suggestions.map((task, index) => `
+                        <div class="border border-purple-200 rounded-lg p-4 bg-purple-50 hover:bg-purple-100 transition-colors">
+                            <div class="flex items-start">
+                                <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-purple-600 text-white text-xs font-medium mr-3 flex-shrink-0">
+                                    ${index + 1}
+                                </span>
+                                <div class="flex-1">
+                                    <h4 class="text-sm font-semibold text-gray-900 mb-1">${escapeHtml(task.title)}</h4>
+                                    <p class="text-xs text-gray-600 mb-2">${escapeHtml(task.description || '')}</p>
+                                    <div class="flex items-center space-x-2">
+                                        ${task.priority ? `
+                                            <span class="px-2 py-0.5 text-xs font-medium rounded ${getPriorityBadge(task.priority)}">
+                                                ${escapeHtml(task.priority)}
+                                            </span>
+                                        ` : ''}
+                                        <a href="{{ route('tasks.create', ['project' => $project->id]) }}"
+                                           class="text-xs text-purple-600 hover:text-purple-800 font-medium">
+                                            Create Task →
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <p class="text-xs text-gray-500 mt-3 italic">These are AI-generated suggestions. You can create these tasks manually.</p>
+            `;
+        } else if (data.success && (!data.suggestions || data.suggestions.length === 0)) {
+            content.innerHTML = '<p class="text-gray-600 text-sm">No task suggestions available at this time. Try adding more tasks to the project first.</p>';
+        } else {
+            content.innerHTML = '<p class="text-red-600 text-sm">Error: ' + (data.error || 'Failed to generate task suggestions') + '</p>';
+        }
+    } catch (error) {
+        content.innerHTML = '<p class="text-red-600 text-sm">Error: ' + error.message + '</p>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>Generate';
+    }
+}
+
+function getPriorityBadge(priority) {
+    const badges = {
+        'low': 'bg-green-100 text-green-800',
+        'medium': 'bg-yellow-100 text-yellow-800',
+        'high': 'bg-orange-100 text-orange-800',
+        'urgent': 'bg-red-100 text-red-800'
+    };
+    return badges[priority] || 'bg-gray-100 text-gray-800';
 }
 </script>
 @endsection
