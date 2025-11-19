@@ -51,20 +51,28 @@ Route::middleware('auth')->group(function () {
     Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.update-status');
 
     // AI Features
-    Route::prefix('ai')->name('ai.')->group(function () {
+    Route::prefix('ai')->name('ai.')->middleware('throttle:20,1')->group(function () {
         // AI status
         Route::get('/status', [AIController::class, 'status'])->name('status');
 
-        // Task AI features
-        Route::post('/task/breakdown', [AIController::class, 'breakdownTask'])->name('task.breakdown');
-        Route::post('/task/estimate-hours', [AIController::class, 'estimateHours'])->name('task.estimate-hours');
-        Route::post('/task/suggest-priority', [AIController::class, 'suggestPriority'])->name('task.suggest-priority');
-        Route::post('/task/enhance-description', [AIController::class, 'enhanceDescription'])->name('task.enhance-description');
+        // Task AI features (more restrictive rate limit for expensive operations)
+        Route::post('/task/breakdown', [AIController::class, 'breakdownTask'])
+            ->middleware('throttle:5,1')->name('task.breakdown');
+        Route::post('/task/estimate-hours', [AIController::class, 'estimateHours'])
+            ->middleware('throttle:10,1')->name('task.estimate-hours');
+        Route::post('/task/suggest-priority', [AIController::class, 'suggestPriority'])
+            ->middleware('throttle:10,1')->name('task.suggest-priority');
+        Route::post('/task/enhance-description', [AIController::class, 'enhanceDescription'])
+            ->middleware('throttle:10,1')->name('task.enhance-description');
 
         // Project AI features
-        Route::get('/project/{project}/summary', [AIController::class, 'projectSummary'])->name('project.summary');
-        Route::get('/project/{project}/risks', [AIController::class, 'projectRisks'])->name('project.risks');
-        Route::get('/project/{project}/completion', [AIController::class, 'projectCompletion'])->name('project.completion');
-        Route::get('/project/{project}/suggest-tasks', [AIController::class, 'suggestTasks'])->name('project.suggest-tasks');
+        Route::get('/project/{project}/summary', [AIController::class, 'projectSummary'])
+            ->middleware('throttle:3,1')->name('project.summary');
+        Route::get('/project/{project}/risks', [AIController::class, 'projectRisks'])
+            ->middleware('throttle:5,1')->name('project.risks');
+        Route::get('/project/{project}/completion', [AIController::class, 'projectCompletion'])
+            ->middleware('throttle:5,1')->name('project.completion');
+        Route::get('/project/{project}/suggest-tasks', [AIController::class, 'suggestTasks'])
+            ->middleware('throttle:5,1')->name('project.suggest-tasks');
     });
 });

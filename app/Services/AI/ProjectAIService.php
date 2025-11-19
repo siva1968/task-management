@@ -4,6 +4,7 @@ namespace App\Services\AI;
 
 use App\Models\Project;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class ProjectAIService
 {
@@ -38,13 +39,29 @@ class ProjectAIService
             ->where('status', 'completed')
             ->where('completed_at', '>=', $since)
             ->get(['title'])
-            ->map(fn($t) => $t->title)
+            ->map(fn($t) => AIHelpers::sanitizePromptInput($t->title, 255))
             ->join(', ');
 
+        // Sanitize project data
+        $projectName = AIHelpers::sanitizePromptInput($project->name, 255);
+        $ownerName = AIHelpers::sanitizePromptInput($project->owner->name, 255);
+        $projectStatus = AIHelpers::sanitizePromptInput($project->status, 50);
+
+        // Check cache
+        $cacheKey = AIHelpers::getCacheKey('project_summary', [
+            'project_id' => $project->id,
+            'period' => $period,
+            'metrics' => compact('totalTasks', 'completedTasks', 'inProgressTasks', 'overdueTasks'),
+        ]);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
+
         $prompt = "You are a project manager creating a {$period} status report. Generate a professional summary.\n\n";
-        $prompt .= "Project: {$project->name}\n";
-        $prompt .= "Owner: {$project->owner->name}\n";
-        $prompt .= "Status: {$project->status}\n\n";
+        $prompt .= "Project: {$projectName}\n";
+        $prompt .= "Owner: {$ownerName}\n";
+        $prompt .= "Status: {$projectStatus}\n\n";
 
         $prompt .= "Metrics:\n";
         $prompt .= "- Total Tasks: {$totalTasks}\n";
@@ -64,7 +81,12 @@ class ProjectAIService
         $prompt .= "4. Recommended next steps\n\n";
         $prompt .= "Format with markdown headings and bullet points.";
 
-        return $this->ai->complete($prompt, ['max_tokens' => 800]);
+        $summary = $this->ai->complete($prompt, ['max_tokens' => 800]);
+
+        // Cache the result
+        Cache::put($cacheKey, $summary, AIHelpers::getCacheDuration('project_summary'));
+
+        return $summary;
     }
 
     /**
@@ -80,15 +102,30 @@ class ProjectAIService
             ->whereDoesntHave('assignedUsers')
             ->count();
 
+        $totalTasks = $project->tasks->count();
+        $daysUntilDeadline = $project->end_date ? Carbon::now()->diffInDays($project->end_date, false) : null;
+
+        // Sanitize project data
+        $projectName = AIHelpers::sanitizePromptInput($project->name, 255);
+
+        // Check cache
+        $cacheKey = AIHelpers::getCacheKey('project_risks', [
+            'project_id' => $project->id,
+            'metrics' => compact('totalTasks', 'overdueTasks', 'urgentTasks', 'unassignedTasks', 'daysUntilDeadline'),
+        ]);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
+
         $prompt = "You are a project risk analyst. Analyze potential risks for this project.\n\n";
-        $prompt .= "Project: {$project->name}\n";
-        $prompt .= "Total Tasks: {$project->tasks->count()}\n";
+        $prompt .= "Project: {$projectName}\n";
+        $prompt .= "Total Tasks: {$totalTasks}\n";
         $prompt .= "Overdue Tasks: {$overdueTasks}\n";
         $prompt .= "Urgent Tasks: {$urgentTasks}\n";
         $prompt .= "Unassigned Tasks: {$unassignedTasks}\n";
 
-        if ($project->end_date) {
-            $daysUntilDeadline = Carbon::now()->diffInDays($project->end_date, false);
+        if ($daysUntilDeadline !== null) {
             $prompt .= "Days Until Deadline: {$daysUntilDeadline}\n";
         }
 
@@ -106,7 +143,12 @@ class ProjectAIService
 
         $result = $this->ai->completeJson($prompt);
 
-        return $result['risks'] ?? [];
+        $risks = $result['risks'] ?? [];
+
+        // Cache the result
+        Cache::put($cacheKey, $risks, AIHelpers::getCacheDuration('project_risks'));
+
+        return $risks;
     }
 
     /**
@@ -128,16 +170,30 @@ class ProjectAIService
             ->get();
 
         $avgHoursPerTask = $completedWithDates->avg('actual_hours') ?? 8;
+        $plannedEndDate = $project->end_date ? $project->end_date->format('Y-m-d') : null;
+
+        // Sanitize project data
+        $projectName = AIHelpers::sanitizePromptInput($project->name, 255);
+
+        // Check cache
+        $cacheKey = AIHelpers::getCacheKey('project_completion', [
+            'project_id' => $project->id,
+            'metrics' => compact('totalTasks', 'completedTasks', 'remainingTasks', 'avgHoursPerTask', 'plannedEndDate'),
+        ]);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
 
         $prompt = "You are a project timeline analyst. Predict the project completion date.\n\n";
-        $prompt .= "Project: {$project->name}\n";
+        $prompt .= "Project: {$projectName}\n";
         $prompt .= "Total Tasks: {$totalTasks}\n";
         $prompt .= "Completed: {$completedTasks}\n";
         $prompt .= "Remaining: {$remainingTasks}\n";
         $prompt .= "Average Hours per Task: " . round($avgHoursPerTask, 1) . "\n";
 
-        if ($project->end_date) {
-            $prompt .= "Planned End Date: {$project->end_date->format('Y-m-d')}\n";
+        if ($plannedEndDate) {
+            $prompt .= "Planned End Date: {$plannedEndDate}\n";
         }
 
         $prompt .= "\nPredict completion with JSON:\n";
@@ -150,6 +206,11 @@ class ProjectAIService
 
         $result = $this->ai->completeJson($prompt);
 
-        return $result ?? [];
+        $prediction = $result ?? [];
+
+        // Cache the result
+        Cache::put($cacheKey, $prediction, AIHelpers::getCacheDuration('project_completion'));
+
+        return $prediction;
     }
 }
