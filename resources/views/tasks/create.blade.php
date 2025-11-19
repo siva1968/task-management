@@ -46,9 +46,18 @@
 
             <!-- Description -->
             <div>
-                <label for="description" class="block text-sm font-medium text-gray-700">
-                    Description
-                </label>
+                <div class="flex items-center justify-between mb-1">
+                    <label for="description" class="block text-sm font-medium text-gray-700">
+                        Description
+                    </label>
+                    <button type="button" onclick="enhanceDescription()" id="ai-enhance-btn"
+                            class="inline-flex items-center px-2 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        AI Enhance
+                    </button>
+                </div>
                 <textarea name="description" id="description" rows="4"
                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('description') border-red-500 @enderror">{{ old('description') }}</textarea>
                 @error('description')
@@ -73,9 +82,18 @@
 
                 <!-- Priority -->
                 <div>
-                    <label for="priority" class="block text-sm font-medium text-gray-700">
-                        Priority <span class="text-red-500">*</span>
-                    </label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="priority" class="block text-sm font-medium text-gray-700">
+                            Priority <span class="text-red-500">*</span>
+                        </label>
+                        <button type="button" onclick="suggestPriority()" id="ai-priority-btn"
+                                class="inline-flex items-center px-2 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            AI Suggest
+                        </button>
+                    </div>
                     <select name="priority" id="priority" required
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         <option value="low" {{ old('priority') === 'low' ? 'selected' : '' }}>Low</option>
@@ -87,9 +105,18 @@
 
                 <!-- Estimated Hours -->
                 <div>
-                    <label for="estimated_hours" class="block text-sm font-medium text-gray-700">
-                        Estimated Hours
-                    </label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="estimated_hours" class="block text-sm font-medium text-gray-700">
+                            Estimated Hours
+                        </label>
+                        <button type="button" onclick="estimateHours()" id="ai-estimate-btn"
+                                class="inline-flex items-center px-2 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            AI Estimate
+                        </button>
+                    </div>
                     <input type="number" name="estimated_hours" id="estimated_hours" step="0.5" min="0"
                            value="{{ old('estimated_hours') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -139,4 +166,128 @@
         </form>
     </div>
 </div>
+
+<script>
+// Get CSRF token
+const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+// AI Enhance Description
+async function enhanceDescription() {
+    const title = document.getElementById('title').value;
+    const description = document.getElementById('description').value;
+    const btn = document.getElementById('ai-enhance-btn');
+
+    if (!title) {
+        alert('Please enter a task title first');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Enhancing...';
+
+    try {
+        const response = await fetch('/ai/task/enhance-description', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({ title, description })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById('description').value = data.description;
+        } else {
+            alert('AI Error: ' + (data.error || 'Failed to enhance description'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>AI Enhance';
+    }
+}
+
+// AI Suggest Priority
+async function suggestPriority() {
+    const title = document.getElementById('title').value;
+    const description = document.getElementById('description').value;
+    const dueDate = document.getElementById('due_date').value;
+    const btn = document.getElementById('ai-priority-btn');
+
+    if (!title) {
+        alert('Please enter a task title first');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Suggesting...';
+
+    try {
+        const response = await fetch('/ai/task/suggest-priority', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({ title, description, due_date: dueDate })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById('priority').value = data.priority;
+        } else {
+            alert('AI Error: ' + (data.error || 'Failed to suggest priority'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>AI Suggest';
+    }
+}
+
+// AI Estimate Hours
+async function estimateHours() {
+    const title = document.getElementById('title').value;
+    const description = document.getElementById('description').value;
+    const priority = document.getElementById('priority').value;
+    const btn = document.getElementById('ai-estimate-btn');
+
+    if (!title) {
+        alert('Please enter a task title first');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Estimating...';
+
+    try {
+        const response = await fetch('/ai/task/estimate-hours', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({ title, description, priority })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById('estimated_hours').value = data.estimated_hours;
+        } else {
+            alert('AI Error: ' + (data.error || 'Failed to estimate hours'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>AI Estimate';
+    }
+}
+</script>
 @endsection

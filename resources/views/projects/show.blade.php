@@ -70,6 +70,30 @@
                 @endif
             </div>
 
+            <!-- AI Project Summary -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">AI Project Summary</h2>
+                    <div class="flex items-center space-x-2">
+                        <select id="summary-period" class="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="weekly">Weekly</option>
+                            <option value="daily">Daily</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                        <button onclick="generateSummary()" id="generate-summary-btn"
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            Generate
+                        </button>
+                    </div>
+                </div>
+                <div id="ai-summary-content" class="prose prose-sm max-w-none text-gray-700">
+                    <p class="text-gray-500 italic">Click "Generate" to create an AI-powered project summary</p>
+                </div>
+            </div>
+
             <!-- Tasks List -->
             <div class="bg-white shadow rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -242,4 +266,52 @@
         </div>
     </div>
 </div>
+
+<script>
+// Markdown converter (simple version)
+function convertMarkdownToHTML(markdown) {
+    return markdown
+        // Headers
+        .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold mt-4 mb-2">$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold mt-6 mb-3">$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-semibold mt-8 mb-4">$1</h1>')
+        // Bold
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+        // Bullet lists
+        .replace(/^\- (.*$)/gim, '<li class="ml-4">$1</li>')
+        .replace(/(<li.*<\/li>)/gim, '<ul class="list-disc list-inside mb-2">$1</ul>')
+        // Line breaks
+        .replace(/\n/gim, '<br>');
+}
+
+// Generate AI Project Summary
+async function generateSummary() {
+    const projectId = {{ $project->id }};
+    const period = document.getElementById('summary-period').value;
+    const btn = document.getElementById('generate-summary-btn');
+    const content = document.getElementById('ai-summary-content');
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...';
+    content.innerHTML = '<p class="text-gray-500 italic">AI is generating your project summary...</p>';
+
+    try {
+        const response = await fetch(`/ai/project/${projectId}/summary?period=${period}`);
+        const data = await response.json();
+
+        if (data.success) {
+            content.innerHTML = convertMarkdownToHTML(data.summary);
+        } else {
+            content.innerHTML = '<p class="text-red-600">Error: ' + (data.error || 'Failed to generate summary') + '</p>';
+        }
+    } catch (error) {
+        content.innerHTML = '<p class="text-red-600">Error: ' + error.message + '</p>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Generate';
+    }
+}
+</script>
 @endsection
