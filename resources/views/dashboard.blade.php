@@ -178,7 +178,7 @@
                                 @if($project->client_name)
                                 {{ $project->client_name }} •
                                 @endif
-                                {{ $project->tasks->count() }} tasks
+                                {{ $project->tasks_count }} tasks
                             </p>
                         </div>
                         <div class="ml-4 flex-shrink-0">

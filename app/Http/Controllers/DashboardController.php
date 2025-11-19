@@ -36,6 +36,7 @@ class DashboardController extends Controller
 
         // Get recent projects
         $recentProjects = Project::with('owner')
+            ->withCount('tasks')
             ->latest()
             ->limit(5)
             ->get();
