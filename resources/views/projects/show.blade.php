@@ -91,7 +91,7 @@
                                         Due: {{ $task->due_date->format('M d, Y') }}
                                     </span>
                                     @endif
-                                    @if($task->assignedUsers->count() > 0)
+                                    @if($task->assigned_users_count > 0)
                                     <span class="mx-2">•</span>
                                     <span>{{ $task->assignedUsers->pluck('name')->join(', ') }}</span>
                                     @endif

@@ -128,7 +128,13 @@ class ProjectController extends Controller
     {
         $this->authorize('view', $project);
 
-        $project->load(['owner', 'tasks.assignedUsers']);
+        $project->load([
+            'owner',
+            'tasks' => function ($query) {
+                $query->withCount('assignedUsers');
+            },
+            'tasks.assignedUsers'
+        ]);
 
         // Get project statistics
         $stats = [

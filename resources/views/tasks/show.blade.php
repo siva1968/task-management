@@ -70,7 +70,7 @@
             <!-- Assigned Users -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h2 class="text-lg font-medium text-gray-900 mb-4">Assigned To</h2>
-                @if($task->assignedUsers->count() > 0)
+                @if($task->assigned_users_count > 0)
                 <div class="space-y-3">
                     @foreach($task->assignedUsers as $user)
                     <div class="flex items-center">

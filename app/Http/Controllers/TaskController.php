@@ -24,7 +24,8 @@ class TaskController extends Controller
     {
         $this->authorize('viewAny', Task::class);
 
-        $query = Task::with(['project', 'assignedUsers', 'creator']);
+        $query = Task::with(['project', 'assignedUsers', 'creator'])
+            ->withCount('assignedUsers');
 
         // Filter by project
         if ($request->filled('project')) {
@@ -173,6 +174,7 @@ class TaskController extends Controller
         $this->authorize('view', $task);
 
         $task->load(['project', 'assignedUsers', 'creator']);
+        $task->loadCount('assignedUsers');
 
         return view('tasks.show', compact('task'));
     }
