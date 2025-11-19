@@ -74,11 +74,20 @@ class TaskController extends Controller
 
         $tasks = $query->paginate(20);
 
-        // Get filter options
-        $projects = Project::orderBy('name')->get();
-        $users = User::where('tenant_id', auth()->user()->tenant_id)
-            ->orderBy('name')
-            ->get();
+        // Get filter options (cached for 5 minutes)
+        $projects = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_projects',
+            300, // 5 minutes
+            fn() => Project::orderBy('name')->get()
+        );
+
+        $users = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_users',
+            300, // 5 minutes
+            fn() => User::where('tenant_id', auth()->user()->tenant_id)
+                ->orderBy('name')
+                ->get()
+        );
 
         return view('tasks.index', compact('tasks', 'projects', 'users'));
     }
@@ -90,10 +99,20 @@ class TaskController extends Controller
     {
         $this->authorize('create', Task::class);
 
-        $projects = Project::orderBy('name')->get();
-        $users = User::where('tenant_id', auth()->user()->tenant_id)
-            ->orderBy('name')
-            ->get();
+        // Get dropdown options (cached for 5 minutes)
+        $projects = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_projects',
+            300,
+            fn() => Project::orderBy('name')->get()
+        );
+
+        $users = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_users',
+            300,
+            fn() => User::where('tenant_id', auth()->user()->tenant_id)
+                ->orderBy('name')
+                ->get()
+        );
 
         return view('tasks.create', compact('projects', 'users'));
     }
@@ -186,10 +205,20 @@ class TaskController extends Controller
     {
         $this->authorize('update', $task);
 
-        $projects = Project::orderBy('name')->get();
-        $users = User::where('tenant_id', auth()->user()->tenant_id)
-            ->orderBy('name')
-            ->get();
+        // Get dropdown options (cached for 5 minutes)
+        $projects = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_projects',
+            300,
+            fn() => Project::orderBy('name')->get()
+        );
+
+        $users = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_users',
+            300,
+            fn() => User::where('tenant_id', auth()->user()->tenant_id)
+                ->orderBy('name')
+                ->get()
+        );
 
         $task->load('assignedUsers');
 

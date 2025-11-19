@@ -66,9 +66,14 @@ class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
-        $users = User::where('tenant_id', auth()->user()->tenant_id)
-            ->orderBy('name')
-            ->get();
+        // Get users dropdown (cached for 5 minutes)
+        $users = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_users',
+            300,
+            fn() => User::where('tenant_id', auth()->user()->tenant_id)
+                ->orderBy('name')
+                ->get()
+        );
 
         return view('projects.create', compact('users'));
     }
@@ -163,9 +168,14 @@ class ProjectController extends Controller
     {
         $this->authorize('update', $project);
 
-        $users = User::where('tenant_id', auth()->user()->tenant_id)
-            ->orderBy('name')
-            ->get();
+        // Get users dropdown (cached for 5 minutes)
+        $users = cache()->remember(
+            'tenant_' . auth()->user()->tenant_id . '_users',
+            300,
+            fn() => User::where('tenant_id', auth()->user()->tenant_id)
+                ->orderBy('name')
+                ->get()
+        );
 
         return view('projects.edit', compact('project', 'users'));
     }
