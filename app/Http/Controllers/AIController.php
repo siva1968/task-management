@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AIException;
+use App\Exceptions\AIRateLimitException;
+use App\Exceptions\AIValidationException;
 use App\Models\Project;
 use App\Models\Task;
 use App\Services\AI\AIService;
@@ -9,6 +12,7 @@ use App\Services\AI\ProjectAIService;
 use App\Services\AI\TaskAIService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class AIController extends Controller
 {
@@ -25,13 +29,67 @@ class AIController extends Controller
     }
 
     /**
+     * Handle AI exceptions and return appropriate responses
+     */
+    protected function handleAIException(\Exception $e, string $operation, array $context = [])
+    {
+        // Build log context
+        $logContext = array_merge([
+            'operation' => $operation,
+            'user_id' => auth()->id(),
+            'error_type' => get_class($e),
+            'error_message' => $e->getMessage(),
+        ], $context);
+
+        if ($e instanceof AIException) {
+            // Log with appropriate level based on exception type
+            if ($e instanceof AIRateLimitException) {
+                Log::warning("AI rate limit exceeded: {$operation}", $logContext);
+                return response()->json([
+                    'success' => false,
+                    'error' => $e->getUserMessage(),
+                    'retry_after' => $e->getRetryAfter(),
+                ], 429);
+            }
+
+            if ($e instanceof AIValidationException) {
+                Log::info("AI validation error: {$operation}", $logContext);
+                return response()->json([
+                    'success' => false,
+                    'error' => $e->getUserMessage(),
+                ], 422);
+            }
+
+            // Other AI exceptions
+            Log::error("AI operation failed: {$operation}", array_merge($logContext, [
+                'provider' => $e->getProvider(),
+                'retryable' => $e->isRetryable(),
+            ]));
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getUserMessage(),
+                'retryable' => $e->isRetryable(),
+            ], $e->getCode() ?: 500);
+        }
+
+        // Generic exception - log as error
+        Log::error("Unexpected error in AI operation: {$operation}", $logContext);
+
+        return response()->json([
+            'success' => false,
+            'error' => 'An unexpected error occurred. Please try again later.',
+        ], 500);
+    }
+
+    /**
      * Break down a task into subtasks.
      */
     public function breakdownTask(Request $request)
     {
         $request->validate([
             'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'description' => 'nullable|string|max:5000',
         ]);
 
         try {
@@ -40,17 +98,20 @@ class AIController extends Controller
                 $request->description
             );
 
+            Log::info('AI task breakdown successful', [
+                'user_id' => auth()->id(),
+                'subtasks_count' => count($subtasks),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'subtasks' => $subtasks,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI breakdown task error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to generate subtasks: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'breakdown_task', [
+                'title_length' => strlen($request->title),
+                'has_description' => !empty($request->description),
+            ]);
         }
     }
 
@@ -61,7 +122,7 @@ class AIController extends Controller
     {
         $request->validate([
             'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'description' => 'nullable|string|max:5000',
             'priority' => 'nullable|in:low,medium,high,urgent',
         ]);
 
@@ -72,17 +133,20 @@ class AIController extends Controller
                 $request->priority
             );
 
+            Log::info('AI hours estimation successful', [
+                'user_id' => auth()->id(),
+                'estimated_hours' => $hours,
+                'priority' => $request->priority,
+            ]);
+
             return response()->json([
                 'success' => true,
                 'estimated_hours' => $hours,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI estimate hours error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to estimate hours: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'estimate_hours', [
+                'priority' => $request->priority,
+            ]);
         }
     }
 
@@ -93,7 +157,7 @@ class AIController extends Controller
     {
         $request->validate([
             'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'description' => 'nullable|string|max:5000',
             'due_date' => 'nullable|date',
         ]);
 
@@ -104,17 +168,20 @@ class AIController extends Controller
                 $request->due_date
             );
 
+            Log::info('AI priority suggestion successful', [
+                'user_id' => auth()->id(),
+                'suggested_priority' => $priority,
+                'has_due_date' => !empty($request->due_date),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'priority' => $priority,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI suggest priority error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to suggest priority: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'suggest_priority', [
+                'has_due_date' => !empty($request->due_date),
+            ]);
         }
     }
 
@@ -125,7 +192,7 @@ class AIController extends Controller
     {
         $request->validate([
             'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'description' => 'nullable|string|max:5000',
         ]);
 
         try {
@@ -134,17 +201,18 @@ class AIController extends Controller
                 $request->description
             );
 
+            Log::info('AI description enhancement successful', [
+                'user_id' => auth()->id(),
+                'original_length' => strlen($request->description ?? ''),
+                'enhanced_length' => strlen($enhanced),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'description' => $enhanced,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI enhance description error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to enhance description: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'enhance_description');
         }
     }
 
@@ -165,17 +233,21 @@ class AIController extends Controller
                 $request->get('period', 'weekly')
             );
 
+            Log::info('AI project summary generated', [
+                'user_id' => auth()->id(),
+                'project_id' => $project->id,
+                'period' => $request->get('period', 'weekly'),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'summary' => $summary,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI project summary error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to generate summary: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'project_summary', [
+                'project_id' => $project->id,
+                'period' => $request->get('period', 'weekly'),
+            ]);
         }
     }
 
@@ -189,17 +261,20 @@ class AIController extends Controller
         try {
             $risks = $this->projectAI->analyzeRisks($project);
 
+            Log::info('AI risk analysis completed', [
+                'user_id' => auth()->id(),
+                'project_id' => $project->id,
+                'risks_count' => count($risks),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'risks' => $risks,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI project risks error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to analyze risks: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'project_risks', [
+                'project_id' => $project->id,
+            ]);
         }
     }
 
@@ -213,17 +288,21 @@ class AIController extends Controller
         try {
             $prediction = $this->projectAI->predictCompletion($project);
 
+            Log::info('AI completion prediction generated', [
+                'user_id' => auth()->id(),
+                'project_id' => $project->id,
+                'predicted_date' => $prediction['predicted_date'] ?? null,
+                'on_track' => $prediction['on_track'] ?? null,
+            ]);
+
             return response()->json([
                 'success' => true,
                 'prediction' => $prediction,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI project completion error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to predict completion: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'project_completion', [
+                'project_id' => $project->id,
+            ]);
         }
     }
 
@@ -237,17 +316,20 @@ class AIController extends Controller
         try {
             $suggestions = $this->taskAI->suggestNextTasks($project);
 
+            Log::info('AI task suggestions generated', [
+                'user_id' => auth()->id(),
+                'project_id' => $project->id,
+                'suggestions_count' => count($suggestions),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'suggestions' => $suggestions,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI suggest tasks error', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to suggest tasks: ' . $e->getMessage(),
-            ], 500);
+            return $this->handleAIException($e, 'suggest_tasks', [
+                'project_id' => $project->id,
+            ]);
         }
     }
 
@@ -267,11 +349,15 @@ class AIController extends Controller
                 'available_providers' => array_keys($available),
             ]);
         } catch (\Exception $e) {
+            Log::error('AI status check failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'is_available' => false,
-                'error' => $e->getMessage(),
-            ]);
+                'error' => 'Unable to check AI service status',
+            ], 500);
         }
     }
 }
