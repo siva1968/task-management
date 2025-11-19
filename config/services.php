@@ -31,4 +31,24 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI Services Configuration
+    |--------------------------------------------------------------------------
+    */
+
+    'ai' => [
+        'default_provider' => env('AI_DEFAULT_PROVIDER', 'openai'),
+    ],
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-3.5-turbo'),
+    ],
+
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'),
+    ],
+
 ];
