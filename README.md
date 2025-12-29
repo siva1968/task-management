@@ -9,8 +9,14 @@ A cross-platform mobile application for Android and iOS built with React Native 
 - ✅ **Task Management**: Create, update, delete, and view tasks
 - 🎯 **Priority Levels**: Organize tasks by priority (Low, Medium, High, Urgent)
 - 📊 **Status Tracking**: Track task status (Pending, In Progress, Completed, Archived)
+- ⏱️ **Time Tracking**: Log time entries for tasks
+- 📈 **Dashboard**: Overview with task statistics and team workload
+- 🔔 **Notifications**: Real-time notifications with mark as read
+- 📊 **Reports**: Task reports, time tracking, and team analytics
+- 🎯 **Goals & KPIs**: Employee goals and performance indicators
 - 🔄 **Real-time Sync**: Connected to REST API backend
 - 📝 **TypeScript**: Full type safety throughout the application
+- 🎨 **Bottom Tab Navigation**: Easy navigation between features
 
 ## Tech Stack
 
@@ -27,14 +33,41 @@ The app connects to the following REST API:
 **Base URL**: `https://tasks.getinstantleads.in/wp-json/sdm-mobile/v1/`
 
 ### Endpoints Used:
+
+**Authentication:**
 - `POST /auth/login` - User authentication
 - `POST /auth/refresh` - Token refresh
+
+**Tasks:**
 - `GET /tasks` - Fetch all tasks
 - `GET /tasks/{id}` - Get single task
 - `POST /tasks` - Create new task
 - `PUT /tasks/{id}` - Update task
 - `DELETE /tasks/{id}` - Delete task
 - `POST /tasks/{id}/status` - Update task status
+- `POST /tasks/{id}/time` - Log time entry
+
+**Dashboard:**
+- `GET /dashboard/summary` - Get dashboard summary
+- `GET /dashboard/team-workload` - Get team workload
+- `GET /dashboard/trends` - Get trends data
+
+**Notifications:**
+- `GET /notifications` - Get notifications
+- `POST /notifications/{id}/read` - Mark as read
+
+**Reports:**
+- `GET /reports/tasks` - Task reports
+- `GET /reports/time-tracking` - Time tracking reports
+- `GET /reports/client/{id}` - Client reports
+- `GET /reports/team` - Team reports
+- `POST /reports/export` - Export reports (PDF, CSV, Excel)
+- `POST /reports/schedule` - Schedule reports
+
+**Goals & Employees:**
+- `GET /employees/{id}/kpis` - Get KPIs
+- `GET /employees/{id}/goals` - Get goals
+- `POST /goals` - Create goal
 
 ## Prerequisites
 
@@ -142,14 +175,22 @@ task-management/
 │   │   └── Task.ts         # Task model and enums
 │   ├── screens/            # App screens
 │   │   ├── LoginScreen.tsx
+│   │   ├── DashboardScreen.tsx
 │   │   ├── TaskListScreen.tsx
 │   │   ├── TaskDetailScreen.tsx
-│   │   └── AddEditTaskScreen.tsx
+│   │   ├── AddEditTaskScreen.tsx
+│   │   ├── NotificationsScreen.tsx
+│   │   ├── ReportsScreen.tsx
+│   │   └── GoalsScreen.tsx
 │   └── services/           # Business logic and API calls
-│       ├── ApiClient.ts    # HTTP client with auth
-│       ├── AuthService.ts  # Authentication logic
-│       └── TaskService.ts  # Task CRUD operations
-├── App.tsx                  # Main app component
+│       ├── ApiClient.ts          # HTTP client with auth
+│       ├── AuthService.ts        # Authentication logic
+│       ├── TaskService.ts        # Task CRUD operations
+│       ├── DashboardService.ts   # Dashboard analytics
+│       ├── NotificationService.ts# Notifications
+│       ├── ReportService.ts      # Reports and exports
+│       └── GoalService.ts        # Goals and KPIs
+├── App.tsx                  # Main app component with navigation
 ├── index.js                 # App entry point
 ├── package.json            # Dependencies and scripts
 ├── tsconfig.json           # TypeScript configuration
@@ -302,8 +343,54 @@ The app uses JWT (JSON Web Token) authentication:
 - ✏️ Edit existing task
 - 🗑️ Delete task
 - 🔄 Change task status
+- ⏱️ Log time entries
 - 🔍 Search tasks
 - 📋 Filter by status
+
+## App Screens
+
+### 1. Dashboard
+- **Summary Statistics**: Total, completed, in progress, and overdue tasks
+- **Team Workload**: View team members' assigned and completed tasks
+- **Workload Percentage**: Visual progress bars for team capacity
+- **Pull to Refresh**: Real-time data updates
+
+### 2. Tasks
+- **Task List**: Browse all tasks with status and priority badges
+- **Task Details**: View complete task information
+- **Time Tracking**: Log hours worked on tasks
+- **Status Management**: Quick status updates
+- **Add/Edit**: Full CRUD operations
+
+### 3. Notifications
+- **Notification Feed**: All system notifications
+- **Unread Indicator**: Visual badges for unread items
+- **Mark as Read**: Individual or bulk marking
+- **Type-based Colors**: Info, Success, Warning, Error
+
+### 4. Reports
+- **Task Reports**: Comprehensive task analytics
+- **Time Tracking Reports**: Hours logged by users
+- **Team Reports**: Team productivity metrics
+- **Export**: Download as PDF, CSV, or Excel
+- **Scheduled Reports**: Automated report generation
+
+### 5. Goals & KPIs
+- **Key Performance Indicators**: Track progress vs targets
+- **Goal Management**: Create and monitor goals
+- **Progress Tracking**: Visual progress bars
+- **Trend Indicators**: Up, Down, Stable trends
+- **Goal Status**: Not Started, In Progress, Completed, Overdue
+
+## Navigation
+
+The app uses a **bottom tab navigation** with 5 main sections:
+
+1. 📊 **Dashboard** - Overview and statistics
+2. ✓ **Tasks** - Task management
+3. 🔔 **Alerts** - Notifications
+4. 📈 **Reports** - Analytics and exports
+5. 🎯 **Goals** - KPIs and goals
 
 ## Contributing
 
@@ -336,6 +423,17 @@ For issues and questions:
 
 ## Changelog
 
+### Version 2.0.0 (2025-12-29)
+
+- ✨ Complete feature set implementation
+- 📊 Dashboard with statistics and team workload
+- 🔔 Notifications system with real-time updates
+- 📈 Reports with multiple export formats
+- 🎯 Goals and KPIs tracking
+- ⏱️ Time tracking for tasks
+- 🎨 Bottom tab navigation
+- 📱 22/22 API endpoints integrated (100% coverage)
+
 ### Version 1.0.0 (2025-12-29)
 
 - ✨ Initial release
@@ -344,6 +442,7 @@ For issues and questions:
 - ✅ Full task CRUD operations
 - 🎯 Priority and status management
 - 🔄 REST API integration
+- 📱 8/22 API endpoints integrated
 
 ---
 

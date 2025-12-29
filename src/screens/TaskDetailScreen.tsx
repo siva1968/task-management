@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import {Task, TaskStatus, TaskPriority} from '../models/Task';
 import TaskService from '../services/TaskService';
@@ -24,6 +26,9 @@ const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
   onDelete,
 }) => {
   const [currentTask, setCurrentTask] = useState<Task>(task);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [timeHours, setTimeHours] = useState('');
+  const [timeDescription, setTimeDescription] = useState('');
 
   const getPriorityColor = (priority: TaskPriority): string => {
     switch (priority) {
@@ -83,6 +88,27 @@ const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         },
       },
     ]);
+  };
+
+  const handleLogTime = async () => {
+    const hours = parseFloat(timeHours);
+    if (isNaN(hours) || hours <= 0) {
+      Alert.alert('Error', 'Please enter valid hours');
+      return;
+    }
+
+    try {
+      await TaskService.logTime(currentTask.id, {
+        hours,
+        description: timeDescription,
+      });
+      setShowTimeModal(false);
+      setTimeHours('');
+      setTimeDescription('');
+      Alert.alert('Success', 'Time logged successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to log time');
+    }
   };
 
   return (
@@ -187,6 +213,15 @@ const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Time Tracking</Text>
+          <TouchableOpacity
+            style={styles.logTimeButton}
+            onPress={() => setShowTimeModal(true)}>
+            <Text style={styles.logTimeButtonText}>+ Log Time</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Timestamps</Text>
           <Text style={styles.timestampText}>
             Created: {currentTask.createdAt.toLocaleString()}
@@ -196,6 +231,48 @@ const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
           </Text>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showTimeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowTimeModal(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Log Time</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Hours *"
+              value={timeHours}
+              onChangeText={setTimeHours}
+              keyboardType="decimal-pad"
+            />
+
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Description (optional)"
+              value={timeDescription}
+              onChangeText={setTimeDescription}
+              multiline
+              numberOfLines={3}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowTimeModal(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.logButton]}
+                onPress={handleLogTime}>
+                <Text style={styles.logButtonText}>Log Time</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -333,6 +410,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     marginBottom: 4,
+  },
+  logTimeButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  logTimeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+  },
+  input: {
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    fontSize: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logButton: {
+    backgroundColor: '#34C759',
+  },
+  logButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
