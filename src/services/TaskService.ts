@@ -1,32 +1,27 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Task, CreateTaskInput, UpdateTaskInput, TaskStatus} from '../models/Task';
-
-const TASKS_STORAGE_KEY = '@tasks';
+import ApiClient from './ApiClient';
+import {API_ENDPOINTS} from '../config/api';
 
 /**
- * Service for managing tasks with AsyncStorage persistence
+ * Service for managing tasks via REST API
  */
 class TaskService {
   /**
-   * Get all tasks from storage
+   * Get all tasks from API
    */
   async getTasks(): Promise<Task[]> {
     try {
-      const tasksJson = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
-      if (!tasksJson) {
-        return [];
-      }
-      const tasks = JSON.parse(tasksJson);
-      // Convert date strings back to Date objects
-      return tasks.map((task: any) => ({
+      const response = await ApiClient.get<Task[]>(API_ENDPOINTS.TASKS.GET_ALL);
+      // Convert date strings to Date objects
+      return response.map((task: any) => ({
         ...task,
-        createdAt: new Date(task.createdAt),
-        updatedAt: new Date(task.updatedAt),
-        dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+        createdAt: new Date(task.createdAt || task.created_at),
+        updatedAt: new Date(task.updatedAt || task.updated_at),
+        dueDate: task.dueDate || task.due_date ? new Date(task.dueDate || task.due_date) : undefined,
       }));
     } catch (error) {
       console.error('Error loading tasks:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -34,68 +29,106 @@ class TaskService {
    * Get a single task by ID
    */
   async getTaskById(id: string): Promise<Task | null> {
-    const tasks = await this.getTasks();
-    return tasks.find(task => task.id === id) || null;
+    try {
+      const response = await ApiClient.get<Task>(API_ENDPOINTS.TASKS.GET_BY_ID(id));
+      return {
+        ...response,
+        createdAt: new Date((response as any).createdAt || (response as any).created_at),
+        updatedAt: new Date((response as any).updatedAt || (response as any).updated_at),
+        dueDate: (response as any).dueDate || (response as any).due_date
+          ? new Date((response as any).dueDate || (response as any).due_date)
+          : undefined,
+      };
+    } catch (error) {
+      console.error('Error loading task:', error);
+      return null;
+    }
   }
 
   /**
    * Create a new task
    */
   async createTask(input: CreateTaskInput): Promise<Task> {
-    const tasks = await this.getTasks();
-    const newTask: Task = {
-      ...input,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    tasks.push(newTask);
-    await this.saveTasks(tasks);
-    return newTask;
+    try {
+      const response = await ApiClient.post<Task>(API_ENDPOINTS.TASKS.CREATE, input);
+      return {
+        ...response,
+        createdAt: new Date((response as any).createdAt || (response as any).created_at),
+        updatedAt: new Date((response as any).updatedAt || (response as any).updated_at),
+        dueDate: (response as any).dueDate || (response as any).due_date
+          ? new Date((response as any).dueDate || (response as any).due_date)
+          : undefined,
+      };
+    } catch (error) {
+      console.error('Error creating task:', error);
+      throw error;
+    }
   }
 
   /**
    * Update an existing task
    */
   async updateTask(input: UpdateTaskInput): Promise<Task | null> {
-    const tasks = await this.getTasks();
-    const index = tasks.findIndex(task => task.id === input.id);
-
-    if (index === -1) {
+    try {
+      const response = await ApiClient.put<Task>(
+        API_ENDPOINTS.TASKS.UPDATE(input.id),
+        input,
+      );
+      return {
+        ...response,
+        createdAt: new Date((response as any).createdAt || (response as any).created_at),
+        updatedAt: new Date((response as any).updatedAt || (response as any).updated_at),
+        dueDate: (response as any).dueDate || (response as any).due_date
+          ? new Date((response as any).dueDate || (response as any).due_date)
+          : undefined,
+      };
+    } catch (error) {
+      console.error('Error updating task:', error);
       return null;
     }
-
-    const updatedTask: Task = {
-      ...tasks[index],
-      ...input,
-      updatedAt: new Date(),
-    };
-
-    tasks[index] = updatedTask;
-    await this.saveTasks(tasks);
-    return updatedTask;
   }
 
   /**
    * Delete a task by ID
    */
   async deleteTask(id: string): Promise<boolean> {
-    const tasks = await this.getTasks();
-    const filteredTasks = tasks.filter(task => task.id !== id);
-
-    if (filteredTasks.length === tasks.length) {
-      return false; // Task not found
+    try {
+      await ApiClient.delete(API_ENDPOINTS.TASKS.DELETE(id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      return false;
     }
+  }
 
-    await this.saveTasks(filteredTasks);
-    return true;
+  /**
+   * Update task status
+   */
+  async updateTaskStatus(id: string, status: TaskStatus): Promise<Task | null> {
+    try {
+      const response = await ApiClient.post<Task>(
+        API_ENDPOINTS.TASKS.UPDATE_STATUS(id),
+        {status},
+      );
+      return {
+        ...response,
+        createdAt: new Date((response as any).createdAt || (response as any).created_at),
+        updatedAt: new Date((response as any).updatedAt || (response as any).updated_at),
+        dueDate: (response as any).dueDate || (response as any).due_date
+          ? new Date((response as any).dueDate || (response as any).due_date)
+          : undefined,
+      };
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      return null;
+    }
   }
 
   /**
    * Archive a task (set status to archived)
    */
   async archiveTask(id: string): Promise<Task | null> {
-    return this.updateTask({id, status: TaskStatus.ARCHIVED});
+    return this.updateTaskStatus(id, TaskStatus.ARCHIVED);
   }
 
   /**
@@ -120,22 +153,15 @@ class TaskService {
   }
 
   /**
-   * Save tasks to storage
+   * Log time entry for a task
    */
-  private async saveTasks(tasks: Task[]): Promise<void> {
+  async logTime(id: string, timeData: {hours: number; description?: string}): Promise<void> {
     try {
-      await AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+      await ApiClient.post(API_ENDPOINTS.TASKS.LOG_TIME(id), timeData);
     } catch (error) {
-      console.error('Error saving tasks:', error);
+      console.error('Error logging time:', error);
       throw error;
     }
-  }
-
-  /**
-   * Clear all tasks (useful for development/testing)
-   */
-  async clearAllTasks(): Promise<void> {
-    await AsyncStorage.removeItem(TASKS_STORAGE_KEY);
   }
 }
 
